@@ -8,8 +8,8 @@ from keras import Input, layers, Sequential
 # Helper libraries
 import argparse
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib import image
+#import matplotlib.pyplot as plt
+#from matplotlib import image
 
 
 print(f"TensorFlow Version: {tf.__version__}")
@@ -83,8 +83,47 @@ def build_model2():
   return model
 
 def build_model3():
-  model = None # Add code to define model 1.
+   
   ## This one should use the functional API so you can create the residual connections
+  # Note: The assignment requests Depthwise Separable Convolutions (DS Conv)
+    
+  # 1. Define Input
+  inputs = tf.keras.Input(shape=(32, 32, 3))
+
+  # 2. Block 1: Standard Conv2D (Per instructions: "except for the first one")
+  x = tf.keras.layers.Conv2D(32, (3, 3), strides=2, padding='same', activation='relu')(inputs)
+  x = tf.keras.layers.BatchNormalization()(x)
+
+  # 3. Block 2: SeparableConv2D
+  x = tf.keras.layers.SeparableConv2D(64, (3, 3), strides=2, padding='same', activation='relu')(x)
+  x = tf.keras.layers.BatchNormalization()(x)
+
+  # 4. Block 3: Four pairs of SeparableConv2D (Stride 1)
+  # Pair 1
+  x = tf.keras.layers.SeparableConv2D(128, (3, 3), padding='same', activation='relu')(x)
+  x = tf.keras.layers.BatchNormalization()(x)
+  # Pair 2
+  x = tf.keras.layers.SeparableConv2D(128, (3, 3), padding='same', activation='relu')(x)
+  x = tf.keras.layers.BatchNormalization()(x)
+  # Pair 3
+  x = tf.keras.layers.SeparableConv2D(128, (3, 3), padding='same', activation='relu')(x)
+  x = tf.keras.layers.BatchNormalization()(x)
+  # Pair 4
+  x = tf.keras.layers.SeparableConv2D(128, (3, 3), padding='same', activation='relu')(x)
+  x = tf.keras.layers.BatchNormalization()(x)
+
+  # 5. Output Block
+  x = tf.keras.layers.Flatten()(x)
+  outputs = tf.keras.layers.Dense(10)(x) # Output logits
+
+  # Create the Model
+  model = tf.keras.Model(inputs=inputs, outputs=outputs, name="Separable_CNN")
+
+  # Compile
+  model.compile(optimizer='adam',
+                loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                metrics=['accuracy'])
+
   return model
 
 def build_model50k():
@@ -96,7 +135,7 @@ def build_model50k():
 if __name__ == '__main__':
 
   ########################################
- # --- Load and Prepare Data ---
+  # --- Load and Prepare Data ---
   cifar10 = tf.keras.datasets.cifar10
   (train_images, train_labels), (test_images, test_labels) = cifar10.load_data()
   class_names = ['airplane','automobile','bird','cat','deer','dog','frog','horse','ship','truck']
@@ -215,5 +254,20 @@ if __name__ == '__main__':
 
   
   ### Repeat for model 3 and your best sub-50k params model
+
+  print("\nBuilding Model 3 (Separable / Functional)...")
+  model3 = build_model3()
+  model3.summary()
+
+  print("\nStarting training for Model 3...")
+  history3 = model3.fit(train_images, train_labels, 
+                        epochs=30, 
+                        validation_data=(val_images, val_labels),
+                        verbose=2)
+
+  print("\nEvaluating Model 3 on Test Set...")
+  test_loss, test_acc = model3.evaluate(test_images, test_labels, verbose=2)
+  print(f"Final Test Accuracy: {test_acc*100:.2f}%")
+
   
   
