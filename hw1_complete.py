@@ -127,7 +127,49 @@ def build_model3():
   return model
 
 def build_model50k():
-  model = None # Add code to define model 1.
+  # Strategy: 
+  # 1. Use SeparableConv2D to reduce convolution parameters.
+  # 2. Use GlobalAveragePooling2D to eliminate massive Dense layers.
+  # 3. Use Dropout to fight overfitting.
+  
+  inputs = tf.keras.Input(shape=(32, 32, 3))
+  
+  # --- Block 1: Initial Features ---
+  # Standard Conv2D to capture rich initial RGB details
+  x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu')(inputs)
+  x = tf.keras.layers.BatchNormalization()(x)
+  
+  # --- Block 2: Downsample ---
+  x = tf.keras.layers.SeparableConv2D(64, (3, 3), padding='same', activation='relu')(x)
+  x = tf.keras.layers.BatchNormalization()(x)
+  x = tf.keras.layers.MaxPooling2D((2, 2))(x) # Size: 16x16
+  x = tf.keras.layers.Dropout(0.2)(x) # Prevent memorization
+
+  # --- Block 3: Deep Features ---
+  x = tf.keras.layers.SeparableConv2D(128, (3, 3), padding='same', activation='relu')(x)
+  x = tf.keras.layers.BatchNormalization()(x)
+  x = tf.keras.layers.MaxPooling2D((2, 2))(x) # Size: 8x8
+  x = tf.keras.layers.Dropout(0.3)(x)
+
+  # --- Block 4: Final Features ---
+  x = tf.keras.layers.SeparableConv2D(128, (3, 3), padding='same', activation='relu')(x)
+  x = tf.keras.layers.BatchNormalization()(x)
+  x = tf.keras.layers.MaxPooling2D((2, 2))(x) # Size: 4x4
+  x = tf.keras.layers.Dropout(0.4)(x)
+
+  # --- Output Block (The Parameter Saver) ---
+  # GlobalAveragePooling turns (4, 4, 128) into (128,) vector
+  x = tf.keras.layers.GlobalAveragePooling2D()(x)
+  
+  # Connect directly to output (128 -> 10 = ~1290 params)
+  outputs = tf.keras.layers.Dense(10)(x) 
+
+  model = tf.keras.Model(inputs=inputs, outputs=outputs, name="Best_Model_50k")
+  
+  model.compile(optimizer='adam',
+                loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                metrics=['accuracy'])
+  
   return model
 
 # no training or dataset construction should happen above this line
@@ -267,6 +309,39 @@ if __name__ == '__main__':
 
   print("\nEvaluating Model 3 on Test Set...")
   test_loss, test_acc = model3.evaluate(test_images, test_labels, verbose=2)
+  print(f"Final Test Accuracy: {test_acc*100:.2f}%")
+
+  # ==========================================
+  # MODEL 50k
+  # ==========================================
+  print("\nBuilding Model 50k (Goal: High Acc, <50k Params)...")
+  model50k = build_model50k()
+  model50k.summary() 
+  # ^^^ VERIFY: "Total params" must be < 50,000
+
+  print("\nStarting training for Model 50k...")
+  
+  # We use a ModelCheckpoint to save ONLY the best version (lowest validation loss)
+  # This ensures we don't save an overfitted version from Epoch 30.
+  checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
+      "best_model.h5", 
+      save_best_only=True, 
+      monitor='val_loss'
+  )
+
+  history50k = model50k.fit(train_images, train_labels, 
+                            epochs=30, 
+                            validation_data=(val_images, val_labels),
+                            callbacks=[checkpoint_cb],
+                            verbose=2)
+
+  # Load the best weights we just saved to evaluate "The Best Model"
+  model50k.load_weights("best_model.h5")
+  
+  print("\nEvaluating Best Model (<50k) on Test Set...")
+  test_loss, test_acc = model50k.evaluate(test_images, test_labels, verbose=2)
+
+  print(f"\nRESULTS for Best Model:")
   print(f"Final Test Accuracy: {test_acc*100:.2f}%")
 
   
