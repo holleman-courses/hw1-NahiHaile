@@ -8,33 +8,22 @@ from keras import Input, layers, Sequential
 # Helper libraries
 import argparse
 import numpy as np
-#import matplotlib.pyplot as plt
-#from matplotlib import image
+import matplotlib.pyplot as plt
+from matplotlib import image
 
 
 print(f"TensorFlow Version: {tf.__version__}")
 print(f"Keras Version: {keras.__version__}")
 
 def build_model1():
-  # We define the input shape for CIFAR-10 explicitly
-  input_shape = (32, 32, 3)
   model = tf.keras.Sequential([
-  # 1. Input/Flatten
-  tf.keras.layers.Flatten(input_shape=input_shape),
-  # 2. Dense Layer 1 + LeakyReLU
-  tf.keras.layers.Dense(128),
-  tf.keras.layers.LeakyReLU(alpha=0.1),
-  # 3. Dense Layer 2 + LeakyReLU
-  tf.keras.layers.Dense(128),
-  tf.keras.layers.LeakyReLU(alpha=0.1),
-
-  # 4. Dense Layer 3 + LeakyReLU
-  tf.keras.layers.Dense(128),
-  tf.keras.layers.LeakyReLU(alpha=0.1),
-
-  # 5. Output Layer (No activation, returns logits)
-  tf.keras.layers.Dense(10) 
+        tf.keras.layers.Flatten(input_shape=(32, 32, 3)), # Input layer hidden inside Flatten
+        tf.keras.layers.Dense(128, activation='relu'),    # Dense 1
+        tf.keras.layers.Dense(128, activation='relu'),    # Dense 2
+        tf.keras.layers.Dense(128, activation='relu'),    # Dense 3
+        tf.keras.layers.Dense(10)                         # Output
     ])
+
   # Compile
   model.compile(optimizer='adam',
                   loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
@@ -83,46 +72,95 @@ def build_model2():
   return model
 
 def build_model3():
-   
-  ## This one should use the functional API so you can create the residual connections
-  # Note: The assignment requests Depthwise Separable Convolutions (DS Conv)
+  model = tf.keras.Sequential([
+        # ==========================================
+
+        # ==========================================
+        tf.keras.layers.SeparableConv2D(
+            filters=32,
+            kernel_size=(3, 3),
+            strides=(2, 2),        # Downsample 32x32 -> 16x16
+            padding="same",
+            activation="relu",
+            use_bias=True,
+            input_shape=(32, 32, 3) # Input layer
+        ),
+        tf.keras.layers.BatchNormalization(),
+
+        # ==========================================
+        # Block 2: 64 Filters
+        # Stride 2 (Downsample 16x16 -> 8x8)
+        # ==========================================
+        tf.keras.layers.SeparableConv2D(
+            filters=64,
+            kernel_size=(3, 3),
+            strides=(2, 2),        
+            padding="same",
+            activation="relu",
+            use_bias=True
+        ),
+        tf.keras.layers.BatchNormalization(),
+
+        # ==========================================
+        # Block 3: Four Pairs of 128 Filters
+        # Stride 1 (Keep size 8x8)
+        # ==========================================
+        
+        # Pair 1
+        tf.keras.layers.SeparableConv2D(
+            filters=128,
+            kernel_size=(3, 3),
+            strides=(1, 1),
+            padding="same",
+            activation="relu",
+            use_bias=True
+        ),
+        tf.keras.layers.BatchNormalization(),
+
+        # Pair 2
+        tf.keras.layers.SeparableConv2D(
+            filters=128,
+            kernel_size=(3, 3),
+            strides=(1, 1),
+            padding="same",
+            activation="relu",
+            use_bias=True
+        ),
+        tf.keras.layers.BatchNormalization(),
+
+        # Pair 3
+        tf.keras.layers.SeparableConv2D(
+            filters=128,
+            kernel_size=(3, 3),
+            strides=(1, 1),
+            padding="same",
+            activation="relu",
+            use_bias=True
+        ),
+        tf.keras.layers.BatchNormalization(),
+
+        # Pair 4
+        tf.keras.layers.SeparableConv2D(
+            filters=128,
+            kernel_size=(3, 3),
+            strides=(1, 1),
+            padding="same",
+            activation="relu",
+            use_bias=True
+        ),
+        tf.keras.layers.BatchNormalization(),
+
+        # ==========================================
+        # Output Block
+        # ==========================================
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(10)
+    ])
     
-  # 1. Define Input
-  inputs = tf.keras.Input(shape=(32, 32, 3))
-
-  # 2. Block 1: Standard Conv2D (Per instructions: "except for the first one")
-  x = tf.keras.layers.Conv2D(32, (3, 3), strides=2, padding='same', activation='relu')(inputs)
-  x = tf.keras.layers.BatchNormalization()(x)
-
-  # 3. Block 2: SeparableConv2D
-  x = tf.keras.layers.SeparableConv2D(64, (3, 3), strides=2, padding='same', activation='relu')(x)
-  x = tf.keras.layers.BatchNormalization()(x)
-
-  # 4. Block 3: Four pairs of SeparableConv2D (Stride 1)
-  # Pair 1
-  x = tf.keras.layers.SeparableConv2D(128, (3, 3), padding='same', activation='relu')(x)
-  x = tf.keras.layers.BatchNormalization()(x)
-  # Pair 2
-  x = tf.keras.layers.SeparableConv2D(128, (3, 3), padding='same', activation='relu')(x)
-  x = tf.keras.layers.BatchNormalization()(x)
-  # Pair 3
-  x = tf.keras.layers.SeparableConv2D(128, (3, 3), padding='same', activation='relu')(x)
-  x = tf.keras.layers.BatchNormalization()(x)
-  # Pair 4
-  x = tf.keras.layers.SeparableConv2D(128, (3, 3), padding='same', activation='relu')(x)
-  x = tf.keras.layers.BatchNormalization()(x)
-
-  # 5. Output Block
-  x = tf.keras.layers.Flatten()(x)
-  outputs = tf.keras.layers.Dense(10)(x) # Output logits
-
-  # Create the Model
-  model = tf.keras.Model(inputs=inputs, outputs=outputs, name="Separable_CNN")
-
-  # Compile
+    # Compile the model
   model.compile(optimizer='adam',
-                loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-                metrics=['accuracy'])
+                  loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                  metrics=['accuracy'])
 
   return model
 
