@@ -224,7 +224,7 @@ if __name__ == '__main__':
   num_val_samples = int(len(train_images)*val_frac)
 
   # Choose num_val_samples indices up to the size of train_images, !replace => no repeats
-  # We add a seed here just so your results are reproducible 
+  # We add a seed here so the results are reproducible 
   np.random.seed(42) 
   val_idxs = np.random.choice(np.arange(len(train_images)), size=num_val_samples, replace=False)
   trn_idxs = np.setdiff1d(np.arange(len(train_images)), val_idxs)
@@ -297,7 +297,7 @@ if __name__ == '__main__':
 
   try:
       # 1. Load the image using your specific syntax
-      # We wrap it in np.array() exactly as requested
+      
       test_img = np.array(tf.keras.utils.load_img(
             filename,
             grayscale=False,
